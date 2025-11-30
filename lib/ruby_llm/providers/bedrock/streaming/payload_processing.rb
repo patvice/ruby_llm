@@ -61,7 +61,8 @@ module RubyLLM
               output_tokens: extract_output_tokens(data),
               cached_tokens: extract_cached_tokens(data),
               cache_creation_tokens: extract_cache_creation_tokens(data),
-              tool_calls: extract_tool_calls(data)
+              tool_calls: extract_tool_calls(data),
+              thinking: extract_thinking(data)
             }
           end
 

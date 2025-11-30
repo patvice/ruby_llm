@@ -23,7 +23,8 @@ module RubyLLM
             input_tokens: usage['prompt_tokens'],
             output_tokens: usage['completion_tokens'],
             cached_tokens: cached_tokens,
-            cache_creation_tokens: 0
+            cache_creation_tokens: 0,
+            thinking: data.dig('choices', 0, 'delta', 'reasoning_content')
           )
         end
 

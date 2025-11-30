@@ -1,0 +1,7 @@
+class AddRubyLlmV20ThinkingColumn < ActiveRecord::Migration<%= migration_version %>
+  def change
+    unless column_exists?(:<%= message_table_name %>, :thinking)
+      add_column :<%= message_table_name %>, :thinking, :json
+    end
+  end
+end

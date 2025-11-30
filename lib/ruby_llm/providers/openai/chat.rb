@@ -58,6 +58,7 @@ module RubyLLM
             output_tokens: usage['completion_tokens'],
             cached_tokens: cached_tokens,
             cache_creation_tokens: 0,
+            thinking: message_data['reasoning_content'],
             model_id: data['model'],
             raw: response
           )

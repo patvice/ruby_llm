@@ -13,6 +13,7 @@ module RubyLLM
       def to_llm
         cached = has_attribute?(:cached_tokens) ? self[:cached_tokens] : nil
         cache_creation = has_attribute?(:cache_creation_tokens) ? self[:cache_creation_tokens] : nil
+        thinking_content = has_attribute?(:thinking) ? self[:thinking] : nil
 
         RubyLLM::Message.new(
           role: role.to_sym,
@@ -23,6 +24,7 @@ module RubyLLM
           output_tokens: output_tokens,
           cached_tokens: cached,
           cache_creation_tokens: cache_creation,
+          thinking: thinking_content,
           model_id: model_association&.model_id
         )
       end

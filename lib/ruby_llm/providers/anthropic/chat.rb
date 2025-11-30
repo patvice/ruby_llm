@@ -65,9 +65,10 @@ module RubyLLM
           content_blocks = data['content'] || []
 
           text_content = extract_text_content(content_blocks)
+          thinking_content = extract_thinking_content(content_blocks)
           tool_use_blocks = Tools.find_tool_uses(content_blocks)
 
-          build_message(data, text_content, tool_use_blocks, response)
+          build_message(data, text_content, thinking_content, tool_use_blocks, response)
         end
 
         def extract_text_content(blocks)
@@ -75,7 +76,14 @@ module RubyLLM
           text_blocks.map { |c| c['text'] }.join
         end
 
-        def build_message(data, content, tool_use_blocks, response)
+        def extract_thinking_content(blocks)
+          thinking_blocks = blocks.select { |c| c['type'] == 'thinking' || c['type'] == 'redacted_thinking' }
+          return nil if thinking_blocks.empty?
+
+          thinking_blocks
+        end
+
+        def build_message(data, content, thinking, tool_use_blocks, response) # rubocop:disable Metrics/ParameterLists
           usage = data['usage'] || {}
           cached_tokens = usage['cache_read_input_tokens']
           cache_creation_tokens = usage['cache_creation_input_tokens']
@@ -91,6 +99,7 @@ module RubyLLM
             output_tokens: usage['output_tokens'],
             cached_tokens: cached_tokens,
             cache_creation_tokens: cache_creation_tokens,
+            thinking: thinking,
             model_id: data['model'],
             raw: response
           )

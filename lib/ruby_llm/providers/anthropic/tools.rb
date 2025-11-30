@@ -16,6 +16,11 @@ module RubyLLM
 
           content = []
 
+          # Include thinking blocks first if present (required by Anthropic when extended thinking is enabled)
+          # When extended thinking is enabled, assistant messages with tool_use MUST start with thinking blocks
+          # IMPORTANT: We must preserve complete blocks including 'signature' field
+          add_thinking_blocks(msg.thinking, content)
+
           content << Media.format_text(msg.content) unless msg.content.nil? || msg.content.empty?
 
           msg.tool_calls.each_value do |tool_call|
@@ -26,6 +31,20 @@ module RubyLLM
             role: 'assistant',
             content:
           }
+        end
+
+        def add_thinking_blocks(thinking, content)
+          return if thinking.nil?
+
+          case thinking
+          when Array
+            # Raw blocks from API - include them exactly as received (preserves signature field)
+            thinking.each { |block| content << block }
+          when String
+            # Legacy string format (e.g., from streaming accumulation or old data)
+            # Note: This won't have a signature, so it may fail with extended thinking
+            content << { type: 'thinking', thinking: thinking } unless thinking.empty?
+          end
         end
 
         def format_tool_result(msg)

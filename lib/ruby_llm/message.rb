@@ -6,7 +6,8 @@ module RubyLLM
     ROLES = %i[system user assistant tool].freeze
 
     attr_reader :role, :model_id, :tool_calls, :tool_call_id, :input_tokens, :output_tokens,
-                :cached_tokens, :cache_creation_tokens, :raw
+                :cached_tokens, :cache_creation_tokens, :thinking, :thinking_block_complete,
+                :complete_thinking_block, :raw
     attr_writer :content
 
     def initialize(options = {})
@@ -19,6 +20,9 @@ module RubyLLM
       @output_tokens = options[:output_tokens]
       @cached_tokens = options[:cached_tokens]
       @cache_creation_tokens = options[:cache_creation_tokens]
+      @thinking = options[:thinking]
+      @thinking_block_complete = options[:thinking_block_complete]
+      @complete_thinking_block = options[:complete_thinking_block]
       @raw = options[:raw]
 
       ensure_valid_role
@@ -40,6 +44,10 @@ module RubyLLM
       !tool_call_id.nil? && !tool_call_id.empty?
     end
 
+    def thinking_block_complete?
+      @thinking_block_complete == true
+    end
+
     def tool_results
       content if tool_result?
     end
@@ -54,7 +62,8 @@ module RubyLLM
         input_tokens: input_tokens,
         output_tokens: output_tokens,
         cached_tokens: cached_tokens,
-        cache_creation_tokens: cache_creation_tokens
+        cache_creation_tokens: cache_creation_tokens,
+        thinking: thinking
       }.compact
     end
 

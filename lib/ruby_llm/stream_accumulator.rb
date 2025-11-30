@@ -3,10 +3,12 @@
 module RubyLLM
   # Assembles streaming responses from LLMs into complete messages.
   class StreamAccumulator
-    attr_reader :content, :model_id, :tool_calls
+    attr_reader :content, :model_id, :tool_calls, :thinking, :thinking_blocks
 
     def initialize
       @content = +''
+      @thinking = +''
+      @thinking_blocks = []
       @tool_calls = {}
       @input_tokens = nil
       @output_tokens = nil
@@ -25,6 +27,12 @@ module RubyLLM
         @content << (chunk.content || '')
       end
 
+      # Accumulate thinking text for streaming display
+      @thinking << (chunk.thinking || '')
+
+      # When we get a complete thinking block (with signature), store it
+      @thinking_blocks << chunk.complete_thinking_block if chunk.thinking_block_complete?
+
       count_tokens chunk
       RubyLLM.logger.debug inspect if RubyLLM.config.log_stream_debug
     end
@@ -39,8 +47,18 @@ module RubyLLM
         output_tokens: @output_tokens,
         cached_tokens: @cached_tokens,
         cache_creation_tokens: @cache_creation_tokens,
+        thinking: thinking_for_message,
         raw: response
       )
+    end
+
+    def thinking_for_message
+      # Return complete blocks array if available (includes signatures for multi-turn)
+      # Otherwise fall back to accumulated string for backward compatibility
+      return @thinking_blocks if @thinking_blocks.any?
+      return nil if @thinking.empty?
+
+      @thinking
     end
 
     private

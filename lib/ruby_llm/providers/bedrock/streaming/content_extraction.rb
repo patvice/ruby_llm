@@ -47,6 +47,17 @@ module RubyLLM
             breakdown.values.compact.sum
           end
 
+          def extract_thinking(data)
+            delta_type = data.dig('delta', 'type')
+            block_type = data.dig('content_block', 'type')
+
+            # Handle both 'thinking' and 'redacted_thinking' blocks for extended thinking
+            return data.dig('delta', 'thinking') if delta_type == 'thinking_delta'
+            return data.dig('content_block', 'thinking') if block_type == 'thinking' || block_type == 'redacted_thinking'
+
+            nil
+          end
+
           private
 
           def extract_content_by_type(data)

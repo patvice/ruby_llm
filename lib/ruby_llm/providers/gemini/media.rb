@@ -56,7 +56,7 @@ module RubyLLM
         attachments = []
 
         parts.each_with_index do |part, index|
-          if part['text']
+          if part['text'] && !part['thought']
             text << part['text']
           elsif part['inlineData']
             attachment = build_inline_attachment(part['inlineData'], index)

@@ -70,6 +70,7 @@ module RubyLLM
             tool_calls: tool_calls,
             input_tokens: data.dig('usageMetadata', 'promptTokenCount'),
             output_tokens: calculate_output_tokens(data),
+            thinking: extract_thinking_content(data),
             model_id: data['modelVersion'] || response.env.url.path.split('/')[3].split(':')[0],
             raw: response
           )
@@ -102,6 +103,19 @@ module RubyLLM
           candidates = data.dig('usageMetadata', 'candidatesTokenCount') || 0
           thoughts = data.dig('usageMetadata', 'thoughtsTokenCount') || 0
           candidates + thoughts
+        end
+
+        def extract_thinking_content(data)
+          candidate = data.dig('candidates', 0)
+          return nil unless candidate
+
+          parts = candidate.dig('content', 'parts')
+          return nil unless parts&.any?
+
+          thought_parts = parts.select { |p| p['thought'] == true }
+          return nil if thought_parts.empty?
+
+          thought_parts.map { |p| p['text'] }.compact.join
         end
 
         def response_json_schema_supported?(model)

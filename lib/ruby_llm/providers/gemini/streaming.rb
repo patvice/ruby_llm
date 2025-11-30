@@ -16,6 +16,7 @@ module RubyLLM
             content: extract_content(data),
             input_tokens: extract_input_tokens(data),
             output_tokens: extract_output_tokens(data),
+            thinking: extract_thinking(data),
             tool_calls: extract_tool_calls(data)
           )
         end
@@ -33,7 +34,7 @@ module RubyLLM
           parts = candidate.dig('content', 'parts')
           return nil unless parts
 
-          text_parts = parts.select { |p| p['text'] }
+          text_parts = parts.select { |p| p['text'] && !p['thought'] }
           text_parts.map { |p| p['text'] }.join if text_parts.any?
         end
 
@@ -46,6 +47,19 @@ module RubyLLM
           thoughts = data.dig('usageMetadata', 'thoughtsTokenCount') || 0
           total = candidates + thoughts
           total.positive? ? total : nil
+        end
+
+        def extract_thinking(data)
+          return nil unless data['candidates']&.any?
+
+          candidate = data['candidates'][0]
+          parts = candidate.dig('content', 'parts')
+          return nil unless parts
+
+          thought_parts = parts.select { |p| p['thought'] == true }
+          return nil if thought_parts.empty?
+
+          thought_parts.map { |p| p['text'] }.compact.join
         end
 
         def parse_streaming_error(data)

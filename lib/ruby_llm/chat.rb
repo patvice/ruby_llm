@@ -26,7 +26,9 @@ module RubyLLM
         new_message: nil,
         end_message: nil,
         tool_call: nil,
-        tool_result: nil
+        tool_result: nil,
+        thinking: nil,
+        thinking_complete: nil
       }
     end
 
@@ -117,6 +119,16 @@ module RubyLLM
       self
     end
 
+    def on_thinking(&block)
+      @on[:thinking] = block
+      self
+    end
+
+    def on_thinking_complete(&block)
+      @on[:thinking_complete] = block
+      self
+    end
+
     def each(&)
       messages.each(&)
     end
@@ -180,6 +192,10 @@ module RubyLLM
           first_chunk_received = true
           @on[:new_message]&.call
         end
+
+        # Invoke thinking callbacks
+        @on[:thinking]&.call(chunk.thinking) if chunk.thinking
+        @on[:thinking_complete]&.call(chunk.complete_thinking_block) if chunk.thinking_block_complete?
 
         block.call chunk
       end

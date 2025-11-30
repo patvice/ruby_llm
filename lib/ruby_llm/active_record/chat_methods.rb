@@ -262,6 +262,7 @@ module RubyLLM
           if @message.has_attribute?(:cache_creation_tokens)
             attrs[:cache_creation_tokens] = message.cache_creation_tokens
           end
+          attrs[:thinking] = message.thinking if @message.has_attribute?(:thinking)
 
           # Add model association dynamically
           attrs[self.class.model_association_name] = model_association

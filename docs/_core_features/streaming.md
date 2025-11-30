@@ -28,7 +28,8 @@ After reading this guide, you will know:
 *   How the final accumulated message is handled.
 *   How to integrate streaming with web frameworks like Rails and Sinatra.
 *   How streaming interacts with Tools.
-*   Performance considerations for streaming.
+*   How to capture reasoning/thinking output from supported models.
+*   How to use thinking callbacks for real-time display and persistence.
 
 ## Basic Streaming
 
@@ -57,6 +58,7 @@ Key attributes of a `Chunk`:
 *   `chunk.role`: Always `:assistant` for streamed response chunks.
 *   `chunk.model_id`: The model generating the response (usually present).
 *   `chunk.tool_calls`: A hash containing partial or complete tool call information if the model is invoking a [Tool]({% link _core_features/tools.md %}). The arguments might be streamed incrementally.
+*   `chunk.thinking`: The reasoning/thinking content from models that support extended thinking (see [Streaming with Reasoning Models](#streaming-with-reasoning-models)).
 *   `chunk.input_tokens`: Total input tokens for the request (often `nil` until the final chunk).
 *   `chunk.output_tokens`: Cumulative output tokens *up to this chunk* (behavior varies by provider, often only accurate in the final chunk).
 
@@ -222,6 +224,152 @@ end
 ```
 
 Your streaming block needs to be prepared to handle chunks that contain text content, tool call information, or potentially just metadata.
+
+## Streaming with Reasoning Models
+{: .d-inline-block }
+
+New
+{: .label .label-green }
+
+Some AI models support "extended thinking" or "reasoning" capabilities, where the model shows its internal thought process before providing a final answer. RubyLLM captures this thinking content separately from the main response.
+
+### Supported Providers
+
+RubyLLM extracts thinking/reasoning output from providers that expose it in their API responses:
+
+| Provider | Models | API Field |
+|----------|--------|-----------|
+| **Anthropic** | Claude 3.7 Sonnet, Claude 4 | `thinking` blocks |
+| **Bedrock** | Claude 3.7 Sonnet (via AWS) | `thinking` blocks |
+| **Gemini** | `gemini-2.0-flash-thinking-exp` | `thought` parts |
+| **VertexAI** | Same as Gemini (via Google Cloud) | `thought` parts |
+| **DeepSeek** | `deepseek-reasoner` (R1) | `reasoning_content` |
+| **GPUStack** | Qwen3, other reasoning models | `reasoning_content` |
+| **Ollama** | Qwen3, DeepSeek R1 variants | `reasoning_content` |
+| **Mistral** | Magistral models | `reasoning_content` |
+| **Perplexity** | `sonar-reasoning`, `sonar-reasoning-pro` | `reasoning_content` |
+| **OpenRouter** | Any model with reasoning support | `reasoning_content` |
+
+> **OpenAI's o1/o3/o4 models** do **not** expose their internal reasoning. Their thinking tokens are counted for billing but the content is discarded before the response is returned. This is by design.
+{: .note }
+
+### Enabling Extended Thinking
+
+Each provider has different ways to enable or access reasoning output:
+
+```ruby
+# Anthropic/Bedrock - enable extended thinking with a token budget
+chat = RubyLLM.chat(model: 'claude-sonnet-4-20250514')
+chat.with_params(
+  thinking: { type: "enabled", budget_tokens: 2000 },
+  max_tokens: 16000
+)
+
+# Gemini/VertexAI - use a thinking model variant
+chat = RubyLLM.chat(model: 'gemini-2.0-flash-thinking-exp')
+
+# DeepSeek - use the reasoner model (thinking is automatic)
+chat = RubyLLM.chat(model: 'deepseek-reasoner')
+
+# GPUStack/Ollama - use a reasoning-capable model like Qwen3
+# Thinking is returned automatically when the model supports it
+chat = RubyLLM.chat(model: 'qwen3')
+```
+
+For models that use `reasoning_content` (DeepSeek, GPUStack, Ollama, etc.), the thinking is returned automatically—no special parameters needed.
+
+### Handling Thinking in Streams
+
+When streaming, thinking content arrives in `chunk.thinking` separately from the main `chunk.content`. This works the same way across all providers:
+
+```ruby
+# Works with any reasoning-capable model:
+# - Anthropic: claude-sonnet-4-20250514 (with thinking params)
+# - DeepSeek: deepseek-reasoner
+# - GPUStack/Ollama: qwen3
+# - Gemini: gemini-2.0-flash-thinking-exp
+
+chat = RubyLLM.chat(model: 'deepseek-reasoner')
+
+response = chat.ask("What is 15 * 17? Think step by step.") do |chunk|
+  # Display thinking content (often shown in a collapsible UI element)
+  if chunk.thinking
+    print "[THINKING] #{chunk.thinking}"
+  end
+
+  # Display regular response content
+  if chunk.content
+    print chunk.content
+  end
+end
+
+# The final message also contains the complete thinking
+puts "\n--- Final Response ---"
+puts "Thinking: #{response.thinking}"
+puts "Answer: #{response.content}"
+```
+
+### Thinking Callbacks
+
+RubyLLM provides dedicated callbacks for handling thinking content during streaming:
+
+```ruby
+chat = RubyLLM.chat(model: 'claude-sonnet-4-20250514')
+  .with_params(thinking: { type: 'enabled', budget_tokens: 5000 })
+
+# Called for each streaming delta (partial thinking text)
+chat.on_thinking do |thinking_text|
+  print thinking_text
+end
+
+# Called when a complete thinking block is received (with signature)
+chat.on_thinking_complete do |thinking_block|
+  # thinking_block is a hash: { 'type' => 'thinking', 'thinking' => '...', 'signature' => '...' }
+  save_thinking_to_database(thinking_block)
+end
+
+chat.ask("What is 15 * 17?") do |chunk|
+  print chunk.content
+end
+```
+
+The `on_thinking_complete` callback is particularly useful for Anthropic's extended thinking, which requires complete thinking blocks (including signatures) to be preserved for multi-turn conversations with tools.
+
+### UI Integration Example
+
+In a web application, you might display thinking content differently from the main response:
+
+```ruby
+# Rails controller with Turbo Streams
+chat.ask(user_message) do |chunk|
+  if chunk.thinking
+    # Update a collapsible "Show reasoning" section
+    Turbo::StreamsChannel.broadcast_append_to(
+      "chat_#{chat_id}",
+      target: "thinking_content",
+      html: chunk.thinking
+    )
+  elsif chunk.content
+    # Update the main response area
+    Turbo::StreamsChannel.broadcast_append_to(
+      "chat_#{chat_id}",
+      target: "response_content",
+      html: chunk.content
+    )
+  end
+end
+```
+
+### Rails Persistence
+
+If you're using the [Rails Integration]({% link _advanced/rails.md %}), the `thinking` attribute is automatically persisted when you run the upgrade generator:
+
+```bash
+rails generate ruby_llm:upgrade_to_v2_0
+rails db:migrate
+```
+
+This adds a `thinking` column to your messages table, and thinking content will be saved alongside regular message content.
 
 ## Next Steps
 
