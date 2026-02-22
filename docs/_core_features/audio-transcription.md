@@ -29,6 +29,7 @@ After reading this guide, you will know:
 
 *   How to transcribe audio files to text.
 *   How to identify different speakers with diarization.
+*   How to stream transcription events as audio is processed.
 *   How to improve accuracy with language hints and prompts.
 *   How to access segments and timestamps.
 
@@ -131,6 +132,34 @@ transcription = RubyLLM.transcribe(
 Speaker references accept file paths, URLs, IO objects, or ActiveStorage attachments.
 
 > **Note:** Gemini models currently return plain text transcripts without segment metadata. Use OpenAI's diarization models when you need speaker labels or timestamps.
+
+## Streaming Transcription
+
+OpenAI transcription models support streaming events during transcription. Provide a block to receive `RubyLLM::TranscriptionChunk` events while the request is in flight:
+
+```ruby
+transcription = RubyLLM.transcribe(
+  "team-meeting.wav",
+  model: "gpt-4o-transcribe-diarize"
+) do |chunk|
+  case chunk.type
+  when "transcript.text.delta"
+    print chunk.delta
+  when "transcript.text.segment"
+    puts "\n#{chunk.segment['speaker']}: #{chunk.segment['text']}"
+  end
+end
+
+puts "\nFinal transcript: #{transcription.text}"
+```
+
+Common stream event types:
+
+*   `transcript.text.delta`: Incremental text updates (`chunk.delta`)
+*   `transcript.text.segment`: Finalized segment metadata (`chunk.segment`)
+*   `transcript.text.done`: Final transcript text and usage metadata
+
+`RubyLLM.transcribe` still returns the final `RubyLLM::Transcription` object after streaming completes.
 
 ## Improving Accuracy with Prompts
 

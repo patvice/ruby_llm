@@ -62,3 +62,4 @@ CLAUDE.md
 .claude
 AGENTS.md
 lib/ruby_llm/models.failed.json
+.DS_Store

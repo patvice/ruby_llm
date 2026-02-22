@@ -15,7 +15,7 @@ module RubyLLM
       @output_tokens = attributes[:output_tokens]
     end
 
-    def self.transcribe(audio_file, **kwargs)
+    def self.transcribe(audio_file, **kwargs, &)
       model = kwargs.delete(:model)
       language = kwargs.delete(:language)
       provider = kwargs.delete(:provider)
@@ -29,7 +29,7 @@ module RubyLLM
                                                        config: config)
       model_id = model.id
 
-      provider_instance.transcribe(audio_file, model: model_id, language:, **options)
+      provider_instance.transcribe(audio_file, model: model_id, language:, **options, &)
     end
   end
 end
